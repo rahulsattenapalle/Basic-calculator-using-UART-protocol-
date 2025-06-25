@@ -1,0 +1,58 @@
+#include <lpc21xx.h>
+
+void uart_init(void) {
+    PINSEL0 |= 0x00000005;   // Enable UART0 TxD0 (P0.0) and RxD0 (P0.1)
+    U0LCR = 0x83;            // 8-bit data, 1 stop bit, no parity, enable DLAB
+    U0DLL = 97;              // 9600 Baud Rate for 15MHz PCLK
+    U0LCR = 0x03;            // Disable DLAB
+}
+
+void uart_tx(char c) {
+    while (!(U0LSR & 0x20));  // Wait until THR empty
+    U0THR = c;
+}
+
+char uart_rx(void) {
+    while (!(U0LSR & 0x01));  // Wait until RDR full
+    return U0RBR;
+}
+
+void uart_string(const char *str) {
+    while (*str)
+        uart_tx(*str++);
+}
+
+void main(void) {
+    char num1 = 0, num2 = 0, result = 0;
+    char op;
+
+    uart_init();
+    uart_string("UART Calculator Ready\r\n");
+    uart_string("Format: A+B\r\n");
+
+    while (1) {
+        uart_string("Enter Expression: ");
+        num1 = uart_rx(); uart_tx(num1);
+        op   = uart_rx(); uart_tx(op);
+        num2 = uart_rx(); uart_tx(num2);
+
+        uart_tx('\r');
+        uart_tx('\n');
+
+        num1 -= '0';  // Convert ASCII to integer
+        num2 -= '0';
+
+        switch (op) {
+            case '+': result = num1 + num2; break;
+            case '-': result = num1 - num2; break;
+            case '*': result = num1 * num2; break;
+            case '/': result = num2 != 0 ? num1 / num2 : 0; break;
+            default: uart_string("Invalid Operator\r\n"); continue;
+        }
+
+        uart_string("Result: ");
+        uart_tx(result + '0');  // Convert result to ASCII
+        uart_tx('\r');
+        uart_tx('\n');
+    }
+}
